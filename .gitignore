@@ -29,6 +29,12 @@ playwright/.cache/
 # Database
 *.db
 
+# Claude Code
+.claude/transcripts/
+
+# Logs
+*.log
+
 # OS
 .DS_Store
 Thumbs.db

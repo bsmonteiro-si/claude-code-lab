@@ -49,7 +49,9 @@ def _to_pipeline_schema(pipeline) -> PipelineSchema:
 
 
 def _enrich_pipeline_execution(execution: PipelineExecution) -> PipelineExecution:
-    execution.pipeline_name = execution.pipeline.name
+    execution.pipeline_name = (
+        execution.pipeline.name if execution.pipeline else "[Deleted Pipeline]"
+    )
     return execution
 
 
