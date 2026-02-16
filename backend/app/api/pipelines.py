@@ -3,8 +3,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.engine.pipeline_executor import PipelineExecutor
 from app.models.pipeline import Pipeline, PipelineExecution
+from app.models.user import User
 from app.schemas.pipeline import (
     PipelineCreateRequest,
     PipelineExecuteRequest,
@@ -60,8 +62,9 @@ def list_pipelines(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     service: PipelineService = Depends(_get_service),
+    current_user: User = Depends(get_current_user),
 ):
-    pipelines, total = service.list_pipelines(skip=skip, limit=limit)
+    pipelines, total = service.list_pipelines(user_id=current_user.id, skip=skip, limit=limit)
     return PipelineListResponse(
         pipelines=[_to_pipeline_schema(p) for p in pipelines],
         total=total,
@@ -72,9 +75,10 @@ def list_pipelines(
 def create_pipeline(
     request: PipelineCreateRequest,
     service: PipelineService = Depends(_get_service),
+    current_user: User = Depends(get_current_user),
 ):
     try:
-        pipeline = service.create_pipeline(request)
+        pipeline = service.create_pipeline(request, user_id=current_user.id)
         return _to_pipeline_schema(pipeline)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -84,8 +88,9 @@ def create_pipeline(
 def get_pipeline(
     pipeline_id: int,
     service: PipelineService = Depends(_get_service),
+    current_user: User = Depends(get_current_user),
 ):
-    pipeline = service.get_pipeline(pipeline_id)
+    pipeline = service.get_pipeline(pipeline_id, user_id=current_user.id)
     if not pipeline:
         raise HTTPException(status_code=404, detail="Pipeline not found")
     return _to_pipeline_schema(pipeline)
@@ -96,9 +101,10 @@ def update_pipeline(
     pipeline_id: int,
     request: PipelineUpdateRequest,
     service: PipelineService = Depends(_get_service),
+    current_user: User = Depends(get_current_user),
 ):
     try:
-        pipeline = service.update_pipeline(pipeline_id, request)
+        pipeline = service.update_pipeline(pipeline_id, request, user_id=current_user.id)
         if not pipeline:
             raise HTTPException(status_code=404, detail="Pipeline not found")
         return _to_pipeline_schema(pipeline)
@@ -110,8 +116,9 @@ def update_pipeline(
 def delete_pipeline(
     pipeline_id: int,
     service: PipelineService = Depends(_get_service),
+    current_user: User = Depends(get_current_user),
 ):
-    deleted = service.delete_pipeline(pipeline_id)
+    deleted = service.delete_pipeline(pipeline_id, user_id=current_user.id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Pipeline not found")
 
@@ -121,10 +128,11 @@ def execute_pipeline(
     pipeline_id: int,
     request: PipelineExecuteRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     try:
         executor = PipelineExecutor(db)
-        execution = executor.execute(pipeline_id, request.variables)
+        execution = executor.execute(pipeline_id, request.variables, user_id=current_user.id)
         return _enrich_pipeline_execution(execution)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -136,7 +144,16 @@ def list_pipeline_executions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    pipeline = (
+        db.query(Pipeline)
+        .filter(Pipeline.id == pipeline_id, Pipeline.user_id == current_user.id)
+        .first()
+    )
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
     total = (
         db.query(func.count(PipelineExecution.id))
         .filter(PipelineExecution.pipeline_id == pipeline_id)
@@ -164,12 +181,20 @@ def list_all_pipeline_executions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    total = db.query(func.count(PipelineExecution.id)).scalar()
+    total = (
+        db.query(func.count(PipelineExecution.id))
+        .join(Pipeline, PipelineExecution.pipeline_id == Pipeline.id)
+        .filter(Pipeline.user_id == current_user.id)
+        .scalar()
+    )
 
     executions = (
         db.query(PipelineExecution)
+        .join(Pipeline, PipelineExecution.pipeline_id == Pipeline.id)
         .options(joinedload(PipelineExecution.pipeline))
+        .filter(Pipeline.user_id == current_user.id)
         .order_by(PipelineExecution.created_at.desc())
         .offset(skip)
         .limit(limit)

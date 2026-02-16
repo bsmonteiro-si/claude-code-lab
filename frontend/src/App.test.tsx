@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { RouterProvider, createMemoryRouter } from "react-router";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
+import { AuthProvider } from "./contexts/AuthContext";
 
 function renderWithRouter(initialRoute = "/") {
   const router = createMemoryRouter(
@@ -14,7 +15,11 @@ function renderWithRouter(initialRoute = "/") {
     ],
     { initialEntries: [initialRoute] }
   );
-  return render(<RouterProvider router={router} />);
+  return render(
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  );
 }
 
 describe("App", () => {

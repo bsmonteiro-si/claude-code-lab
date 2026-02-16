@@ -7,11 +7,11 @@ from app.core.config import settings
 from app.models.base import Base
 
 import app.models.template  # noqa: F401
+import app.models.pipeline  # noqa: F401
+import app.models.user  # noqa: F401
 
 config = context.config
-
-if not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

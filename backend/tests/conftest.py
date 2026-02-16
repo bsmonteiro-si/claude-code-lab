@@ -6,7 +6,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.database import get_db
 from app.main import app
-from app.models import Base  # noqa: F401 - imports Template, TemplateVersion via __init__
+from app.models import Base  # noqa: F401 - imports all models via __init__
 
 
 @pytest.fixture
@@ -40,3 +40,17 @@ def client(db_session):
     app.dependency_overrides[get_db] = _override_get_db
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def auth_headers(client):
+    client.post(
+        "/api/auth/register",
+        json={"email": "testuser@example.com", "display_name": "Test User", "password": "securepass123"},
+    )
+    response = client.post(
+        "/api/auth/login",
+        json={"email": "testuser@example.com", "password": "securepass123"},
+    )
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

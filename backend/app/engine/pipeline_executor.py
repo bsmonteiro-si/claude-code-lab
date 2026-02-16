@@ -15,8 +15,8 @@ class PipelineExecutor:
     def __init__(self, db: Session):
         self.db = db
 
-    def execute(self, pipeline_id: int, variables: dict[str, str]) -> PipelineExecution:
-        pipeline = PipelineService(self.db).get_pipeline(pipeline_id)
+    def execute(self, pipeline_id: int, variables: dict[str, str], user_id: int) -> PipelineExecution:
+        pipeline = PipelineService(self.db).get_pipeline(pipeline_id, user_id)
         if not pipeline:
             raise ValueError("Pipeline not found")
 
@@ -24,10 +24,10 @@ class PipelineExecutor:
         context = dict(variables)
 
         for step in pipeline.steps:
-            step_execution = self._create_step_execution(pipeline_execution, step, context)
+            step_execution = self._create_step_execution(pipeline_execution, step, context, user_id)
 
             try:
-                output = self._execute_step(step, context)
+                output = self._execute_step(step, context, user_id)
                 self._mark_step_completed(step_execution, output)
                 context[step.output_variable] = output
             except Exception as e:
@@ -48,8 +48,8 @@ class PipelineExecutor:
         self.db.flush()
         return execution
 
-    def _create_step_execution(self, pipeline_execution, step, context) -> PipelineStepExecution:
-        template = TemplateService(self.db).get_template(step.template_id)
+    def _create_step_execution(self, pipeline_execution, step, context, user_id: int) -> PipelineStepExecution:
+        template = TemplateService(self.db).get_template(step.template_id, user_id)
         latest_version = template.latest_version
         input_prompt = substitute_variables(latest_version.content, context)
 
@@ -64,8 +64,8 @@ class PipelineExecutor:
         self.db.flush()
         return step_execution
 
-    def _execute_step(self, step, context) -> str:
-        template = TemplateService(self.db).get_template(step.template_id)
+    def _execute_step(self, step, context, user_id: int) -> str:
+        template = TemplateService(self.db).get_template(step.template_id, user_id)
         latest_version = template.latest_version
         resolved_prompt = substitute_variables(latest_version.content, context)
         provider = get_provider(step.provider)

@@ -6,17 +6,21 @@ AGENT_TYPE=$(echo "$INPUT" | jq -r '.agent_type // empty')
 AGENT_ID=$(echo "$INPUT" | jq -r '.agent_id // empty')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 
+DATE_SLUG=$(date +%Y-%m-%d)
+SHORT_ID=$(echo "$SESSION_ID" | cut -c1-8)
+
 if [ -n "$AGENT_TYPE" ]; then
   TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.agent_transcript_path // empty')
   EXPORT_DIR="$CLAUDE_PROJECT_DIR/.claude/transcripts/subagents"
-  FILENAME="${AGENT_TYPE}_$(date +%Y%m%d_%H%M%S)_${AGENT_ID}.md"
-  TITLE="Subagent Transcript: $AGENT_TYPE"
+  SHORT_AGENT_ID=$(echo "$AGENT_ID" | cut -c1-8)
+  FILENAME="${DATE_SLUG}-subagent-${AGENT_TYPE}-${SHORT_AGENT_ID}.md"
+  TITLE="$DATE_SLUG — Subagent Transcript: $AGENT_TYPE"
   HEADER="**Agent:** $AGENT_TYPE\n**Agent ID:** $AGENT_ID\n**Parent Session:** $SESSION_ID"
 else
   TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
   EXPORT_DIR="$CLAUDE_PROJECT_DIR/.claude/transcripts"
-  FILENAME="session_$(date +%Y%m%d_%H%M%S)_${SESSION_ID}.md"
-  TITLE="Claude Code Session"
+  FILENAME="${DATE_SLUG}-transcript-${SHORT_ID}.md"
+  TITLE="$DATE_SLUG — Claude Code Session"
   HEADER="**Session:** $SESSION_ID"
 fi
 
@@ -26,6 +30,10 @@ fi
 
 mkdir -p "$EXPORT_DIR"
 EXPORT_FILE="$EXPORT_DIR/$FILENAME"
+
+strip_ansi() {
+  sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | sed 's/\x1b\[[0-9;]*m//g'
+}
 
 classify_user_message() {
   local text="$1"
@@ -77,7 +85,7 @@ classify_user_message() {
 
       echo "## $label"
       echo ""
-      echo "$content"
+      echo "$content" | strip_ansi
       echo ""
       echo "---"
       echo ""
@@ -100,7 +108,7 @@ classify_user_message() {
         echo "## Assistant"
         echo ""
         if [ -n "$text_content" ]; then
-          echo "$text_content"
+          echo "$text_content" | strip_ansi
           echo ""
         fi
         if [ -n "$tool_uses" ]; then

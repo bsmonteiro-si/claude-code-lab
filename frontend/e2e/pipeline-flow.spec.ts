@@ -1,9 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import { cleanDatabase } from "./cleanup";
+import { loginViaUi } from "./auth-helper";
 
 test.describe("Pipeline Flow: Translate + Summarize", () => {
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     await cleanDatabase();
+    await loginViaUi(page);
   });
 
   test("create templates, build pipeline, execute, and verify result", async ({

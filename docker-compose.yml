@@ -7,19 +7,26 @@ services:
       POSTGRES_PASSWORD: promptlab
       POSTGRES_DB: promptlab
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U promptlab"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
 
   backend:
     build: ./backend
     restart: unless-stopped
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://promptlab:promptlab@postgres:5432/promptlab
+      DATABASE_URL: postgresql://promptlab:promptlab@postgres:5432/promptlab
+      JWT_SECRET_KEY: super-secret-docker-key-change-in-prod
 
   frontend:
     build: ./frontend

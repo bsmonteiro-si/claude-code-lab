@@ -2,6 +2,38 @@
 
 Full-stack prompt engineering platform for designing, testing, and iterating on LLM prompts with real-time feedback.
 
+## Development Workflow
+
+Every code change that affects the frontend — including backend changes to API routes, schemas, or behavior — must follow this feedback loop:
+
+1. **Unit tests** — Run backend (`cd backend && poetry run pytest -v`) and frontend (`cd frontend && npm test && npm run lint`) unit tests to confirm correctness at the code level.
+2. **Browser verification** — Use Claude in Chrome to manually exercise the change in the running app (http://localhost:5173). Navigate the real UI, fill forms, trigger the feature, and confirm it works visually.
+3. **Playwright scripts** — Add or update E2E tests in `frontend/e2e/` to cover the new or changed behavior. Follow existing conventions (shared helpers in `auth-helper.ts`, cleanup in `cleanup.ts`).
+4. **Full E2E suite** — Run `cd frontend && npx playwright test` to confirm all 11+ tests pass. This rebuilds the Docker test environment, runs migrations on a fresh PostgreSQL database, and exercises the app end-to-end.
+
+At the end of every session, run `/save-session` to save a structured summary to `.claude/sessions/`. This gives future sessions context about what was done, decisions made, and files changed.
+
+### Running Playwright Tests
+
+```bash
+# Full suite (parallel, headless)
+cd frontend && npx playwright test
+
+# Slow mode — opens a visible browser with 800ms delay between actions
+cd frontend && SLOW=1 npx playwright test --headed
+
+# Single test file
+cd frontend && npx playwright test e2e/auth.spec.ts
+
+# Single test by name
+cd frontend && npx playwright test -g "register a new account"
+
+# Combine: single test in slow mode
+cd frontend && SLOW=1 npx playwright test --headed -g "register a new account"
+```
+
+The test environment uses `docker-compose.test.yml` (PostgreSQL on 5433, backend on 8001) and a Vite dev server on 5174. Global setup/teardown handle container lifecycle automatically.
+
 ## Tech Stack
 
 - **Backend:** Python 3.12 / FastAPI / SQLAlchemy / Poetry

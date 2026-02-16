@@ -10,6 +10,9 @@ class Template(Base):
     __tablename__ = "templates"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -19,6 +22,7 @@ class Template(Base):
         DateTime(timezone=True), onupdate=func.now()
     )
 
+    user: Mapped["User"] = relationship()
     versions: Mapped[list["TemplateVersion"]] = relationship(
         back_populates="template", cascade="all, delete-orphan"
     )
@@ -42,3 +46,6 @@ class TemplateVersion(Base):
     __table_args__ = (
         Index("uq_template_version", "template_id", "version_number", unique=True),
     )
+
+
+from app.models.user import User  # noqa: E402

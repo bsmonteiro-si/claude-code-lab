@@ -11,6 +11,9 @@ class Pipeline(Base):
     __tablename__ = "pipelines"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -20,10 +23,16 @@ class Pipeline(Base):
         DateTime(timezone=True), onupdate=func.now()
     )
 
+    user: Mapped["User"] = relationship()
     steps: Mapped[list["PipelineStep"]] = relationship(
         back_populates="pipeline",
         cascade="all, delete-orphan",
         order_by="PipelineStep.step_order",
+    )
+    executions: Mapped[list["PipelineExecution"]] = relationship(
+        back_populates="pipeline",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 
@@ -55,7 +64,7 @@ class PipelineExecution(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     pipeline_id: Mapped[int] = mapped_column(
-        ForeignKey("pipelines.id"), nullable=False
+        ForeignKey("pipelines.id", ondelete="CASCADE"), nullable=False
     )
     status: Mapped[ExecutionStatus] = mapped_column(default=ExecutionStatus.PENDING)
     variables: Mapped[str] = mapped_column(Text, nullable=False)
@@ -66,7 +75,7 @@ class PipelineExecution(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    pipeline: Mapped["Pipeline"] = relationship()
+    pipeline: Mapped["Pipeline"] = relationship(back_populates="executions")
 
     step_executions: Mapped[list["PipelineStepExecution"]] = relationship(
         back_populates="pipeline_execution",
@@ -83,7 +92,7 @@ class PipelineStepExecution(Base):
         ForeignKey("pipeline_executions.id", ondelete="CASCADE"), nullable=False
     )
     pipeline_step_id: Mapped[int] = mapped_column(
-        ForeignKey("pipeline_steps.id"), nullable=False
+        ForeignKey("pipeline_steps.id", ondelete="CASCADE"), nullable=False
     )
     step_order: Mapped[int] = mapped_column(nullable=False)
     input_prompt: Mapped[str] = mapped_column(Text, nullable=False)
@@ -103,3 +112,4 @@ class PipelineStepExecution(Base):
 
 
 from app.models.template import Template  # noqa: E402
+from app.models.user import User  # noqa: E402

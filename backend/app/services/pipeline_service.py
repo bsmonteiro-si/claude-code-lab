@@ -10,12 +10,17 @@ class PipelineService:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_pipelines(self, skip: int = 0, limit: int = 50) -> tuple[list[Pipeline], int]:
-        total = self.db.query(func.count(Pipeline.id)).scalar()
+    def list_pipelines(self, user_id: int, skip: int = 0, limit: int = 50) -> tuple[list[Pipeline], int]:
+        total = (
+            self.db.query(func.count(Pipeline.id))
+            .filter(Pipeline.user_id == user_id)
+            .scalar()
+        )
 
         pipelines = (
             self.db.query(Pipeline)
             .options(joinedload(Pipeline.steps).joinedload(PipelineStep.template))
+            .filter(Pipeline.user_id == user_id)
             .offset(skip)
             .limit(limit)
             .all()
@@ -23,18 +28,18 @@ class PipelineService:
 
         return pipelines, total
 
-    def get_pipeline(self, pipeline_id: int) -> Pipeline | None:
+    def get_pipeline(self, pipeline_id: int, user_id: int) -> Pipeline | None:
         return (
             self.db.query(Pipeline)
             .options(joinedload(Pipeline.steps).joinedload(PipelineStep.template))
-            .filter(Pipeline.id == pipeline_id)
+            .filter(Pipeline.id == pipeline_id, Pipeline.user_id == user_id)
             .first()
         )
 
-    def create_pipeline(self, request: PipelineCreateRequest) -> Pipeline:
+    def create_pipeline(self, request: PipelineCreateRequest, user_id: int) -> Pipeline:
         self._validate_template_ids(request.steps)
 
-        pipeline = Pipeline(name=request.name, description=request.description)
+        pipeline = Pipeline(name=request.name, description=request.description, user_id=user_id)
         self.db.add(pipeline)
         self.db.flush()
 
@@ -50,10 +55,10 @@ class PipelineService:
             self.db.add(step)
 
         self.db.commit()
-        return self.get_pipeline(pipeline.id)
+        return self.get_pipeline(pipeline.id, user_id)
 
-    def update_pipeline(self, pipeline_id: int, request: PipelineUpdateRequest) -> Pipeline | None:
-        pipeline = self.get_pipeline(pipeline_id)
+    def update_pipeline(self, pipeline_id: int, request: PipelineUpdateRequest, user_id: int) -> Pipeline | None:
+        pipeline = self.get_pipeline(pipeline_id, user_id)
         if not pipeline:
             return None
 
@@ -67,10 +72,14 @@ class PipelineService:
             self._replace_steps(pipeline, request.steps)
 
         self.db.commit()
-        return self.get_pipeline(pipeline_id)
+        return self.get_pipeline(pipeline_id, user_id)
 
-    def delete_pipeline(self, pipeline_id: int) -> bool:
-        pipeline = self.db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    def delete_pipeline(self, pipeline_id: int, user_id: int) -> bool:
+        pipeline = (
+            self.db.query(Pipeline)
+            .filter(Pipeline.id == pipeline_id, Pipeline.user_id == user_id)
+            .first()
+        )
         if not pipeline:
             return False
 

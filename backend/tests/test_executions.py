@@ -1,21 +1,22 @@
 from unittest.mock import MagicMock, patch
 
 
-def _create_template(client, name="Test Template", content="Hello {{name}}"):
+def _create_template(client, headers, name="Test Template", content="Hello {{name}}"):
     return client.post(
         "/api/templates/",
         json={"name": name, "description": "A test template", "content": content},
+        headers=headers,
     )
 
 
 @patch("app.services.execution_service.get_provider")
-def test_execute_template(mock_get_provider, client):
+def test_execute_template(mock_get_provider, client, auth_headers):
     # Given
     mock_provider = MagicMock()
     mock_provider.execute.return_value = "Mock response"
     mock_get_provider.return_value = mock_provider
 
-    template_response = _create_template(client)
+    template_response = _create_template(client, auth_headers)
     template_id = template_response.json()["id"]
 
     # When
@@ -27,6 +28,7 @@ def test_execute_template(mock_get_provider, client):
             "model": "claude-sonnet-4-5-20250929",
             "variables": {"name": "World"},
         },
+        headers=auth_headers,
     )
 
     # Then
@@ -38,9 +40,9 @@ def test_execute_template(mock_get_provider, client):
 
 
 @patch("app.services.execution_service.get_provider")
-def test_execute_missing_variable(mock_get_provider, client):
+def test_execute_missing_variable(mock_get_provider, client, auth_headers):
     # Given
-    template_response = _create_template(client, content="Hello {{name}}")
+    template_response = _create_template(client, auth_headers, content="Hello {{name}}")
     template_id = template_response.json()["id"]
 
     # When
@@ -52,6 +54,7 @@ def test_execute_missing_variable(mock_get_provider, client):
             "model": "claude-sonnet-4-5-20250929",
             "variables": {},
         },
+        headers=auth_headers,
     )
 
     # Then
@@ -62,13 +65,13 @@ def test_execute_missing_variable(mock_get_provider, client):
 
 
 @patch("app.services.execution_service.get_provider")
-def test_list_executions(mock_get_provider, client):
+def test_list_executions(mock_get_provider, client, auth_headers):
     # Given
     mock_provider = MagicMock()
     mock_provider.execute.return_value = "Mock response"
     mock_get_provider.return_value = mock_provider
 
-    template_response = _create_template(client)
+    template_response = _create_template(client, auth_headers)
     template_id = template_response.json()["id"]
 
     client.post(
@@ -79,6 +82,7 @@ def test_list_executions(mock_get_provider, client):
             "model": "claude-sonnet-4-5-20250929",
             "variables": {"name": "Alice"},
         },
+        headers=auth_headers,
     )
     client.post(
         "/api/executions/",
@@ -88,10 +92,11 @@ def test_list_executions(mock_get_provider, client):
             "model": "claude-sonnet-4-5-20250929",
             "variables": {"name": "Bob"},
         },
+        headers=auth_headers,
     )
 
     # When
-    response = client.get("/api/executions/")
+    response = client.get("/api/executions/", headers=auth_headers)
 
     # Then
     assert response.status_code == 200
@@ -100,9 +105,9 @@ def test_list_executions(mock_get_provider, client):
     assert body["executions"][0]["template_name"] == "Test Template"
 
 
-def test_execute_invalid_provider(client):
+def test_execute_invalid_provider(client, auth_headers):
     # Given
-    template_response = _create_template(client)
+    template_response = _create_template(client, auth_headers)
     template_id = template_response.json()["id"]
 
     # When
@@ -114,6 +119,7 @@ def test_execute_invalid_provider(client):
             "model": "some-model",
             "variables": {"name": "World"},
         },
+        headers=auth_headers,
     )
 
     # Then

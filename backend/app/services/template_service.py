@@ -9,12 +9,17 @@ class TemplateService:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_templates(self, skip: int = 0, limit: int = 50) -> tuple[list[Template], int]:
-        total = self.db.query(func.count(Template.id)).scalar()
+    def list_templates(self, user_id: int, skip: int = 0, limit: int = 50) -> tuple[list[Template], int]:
+        total = (
+            self.db.query(func.count(Template.id))
+            .filter(Template.user_id == user_id)
+            .scalar()
+        )
 
         templates = (
             self.db.query(Template)
             .options(joinedload(Template.versions))
+            .filter(Template.user_id == user_id)
             .offset(skip)
             .limit(limit)
             .all()
@@ -25,11 +30,11 @@ class TemplateService:
 
         return templates, total
 
-    def get_template(self, template_id: int) -> Template | None:
+    def get_template(self, template_id: int, user_id: int) -> Template | None:
         template = (
             self.db.query(Template)
             .options(joinedload(Template.versions))
-            .filter(Template.id == template_id)
+            .filter(Template.id == template_id, Template.user_id == user_id)
             .first()
         )
 
@@ -38,8 +43,8 @@ class TemplateService:
 
         return template
 
-    def create_template(self, request: TemplateCreateRequest) -> Template:
-        template = Template(name=request.name, description=request.description)
+    def create_template(self, request: TemplateCreateRequest, user_id: int) -> Template:
+        template = Template(name=request.name, description=request.description, user_id=user_id)
         self.db.add(template)
         self.db.flush()
 
@@ -55,8 +60,8 @@ class TemplateService:
         template.latest_version = first_version
         return template
 
-    def update_template(self, template_id: int, request: TemplateUpdateRequest) -> Template | None:
-        template = self.get_template(template_id)
+    def update_template(self, template_id: int, request: TemplateUpdateRequest, user_id: int) -> Template | None:
+        template = self.get_template(template_id, user_id)
         if not template:
             return None
 
@@ -77,10 +82,14 @@ class TemplateService:
         self.db.commit()
         self.db.refresh(template)
 
-        return self.get_template(template_id)
+        return self.get_template(template_id, user_id)
 
-    def delete_template(self, template_id: int) -> bool:
-        template = self.db.query(Template).filter(Template.id == template_id).first()
+    def delete_template(self, template_id: int, user_id: int) -> bool:
+        template = (
+            self.db.query(Template)
+            .filter(Template.id == template_id, Template.user_id == user_id)
+            .first()
+        )
         if not template:
             return False
 
@@ -88,7 +97,11 @@ class TemplateService:
         self.db.commit()
         return True
 
-    def get_template_versions(self, template_id: int) -> list[TemplateVersion]:
+    def get_template_versions(self, template_id: int, user_id: int) -> list[TemplateVersion]:
+        template = self.get_template(template_id, user_id)
+        if not template:
+            return []
+
         return (
             self.db.query(TemplateVersion)
             .filter(TemplateVersion.template_id == template_id)

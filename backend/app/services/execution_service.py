@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.engine.providers import get_provider
 from app.engine.variable_substitution import substitute_variables
 from app.models.execution import Execution, ExecutionStatus
+from app.models.template import Template
 from app.schemas.execution import ExecutionCreateRequest
 from app.services.template_service import TemplateService
 
@@ -15,8 +16,8 @@ class ExecutionService:
     def __init__(self, db: Session):
         self.db = db
 
-    def execute_template(self, request: ExecutionCreateRequest) -> Execution:
-        template = TemplateService(self.db).get_template(request.template_id)
+    def execute_template(self, request: ExecutionCreateRequest, user_id: int) -> Execution:
+        template = TemplateService(self.db).get_template(request.template_id, user_id)
         if not template:
             raise ValueError("Template not found")
 
@@ -50,12 +51,19 @@ class ExecutionService:
         execution.template_name = template.name
         return execution
 
-    def list_executions(self, skip: int = 0, limit: int = 50) -> tuple[list[Execution], int]:
-        total = self.db.query(func.count(Execution.id)).scalar()
+    def list_executions(self, user_id: int, skip: int = 0, limit: int = 50) -> tuple[list[Execution], int]:
+        total = (
+            self.db.query(func.count(Execution.id))
+            .join(Template, Execution.template_id == Template.id)
+            .filter(Template.user_id == user_id)
+            .scalar()
+        )
 
         executions = (
             self.db.query(Execution)
+            .join(Template, Execution.template_id == Template.id)
             .options(joinedload(Execution.template))
+            .filter(Template.user_id == user_id)
             .order_by(Execution.created_at.desc())
             .offset(skip)
             .limit(limit)
@@ -67,11 +75,12 @@ class ExecutionService:
 
         return executions, total
 
-    def get_execution(self, execution_id: int) -> Execution | None:
+    def get_execution(self, execution_id: int, user_id: int) -> Execution | None:
         execution = (
             self.db.query(Execution)
+            .join(Template, Execution.template_id == Template.id)
             .options(joinedload(Execution.template))
-            .filter(Execution.id == execution_id)
+            .filter(Execution.id == execution_id, Template.user_id == user_id)
             .first()
         )
 

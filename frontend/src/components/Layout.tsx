@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router";
 import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../hooks/useAuth";
 
 const navigationItems = [
   { to: "/", label: "Home" },
@@ -51,6 +52,22 @@ function ThemePicker() {
   );
 }
 
+function UserSection() {
+  const { user, logout } = useAuth();
+
+  return (
+    <div className="px-4 py-4 border-t border-glass-border">
+      <p className="text-sm text-text-primary truncate">{user?.display_name}</p>
+      <button
+        onClick={logout}
+        className="mt-2 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+      >
+        Log out
+      </button>
+    </div>
+  );
+}
+
 export default function Layout() {
   return (
     <div className="flex h-screen mesh-gradient">
@@ -63,6 +80,7 @@ export default function Layout() {
             <SidebarLink key={item.to} to={item.to} label={item.label} />
           ))}
         </nav>
+        <UserSection />
         <ThemePicker />
       </aside>
       <main className="flex-1 p-8 overflow-auto">

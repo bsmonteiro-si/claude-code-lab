@@ -1,21 +1,20 @@
 import { test, expect } from "@playwright/test";
 import { cleanDatabase } from "./cleanup";
+import { loginViaUi } from "./auth-helper";
 
 test.describe("Smoke Tests", () => {
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     await cleanDatabase();
+    await loginViaUi(page);
   });
-  test("app loads and displays the home page", async ({ page }) => {
-    await page.goto("/");
 
+  test("app loads and displays the home page", async ({ page }) => {
     await expect(page).toHaveTitle("LLM Prompt Lab");
     await expect(page.getByText("LLM Prompt Lab").first()).toBeVisible();
     await expect(page.getByText("Welcome to the LLM Prompt Lab.")).toBeVisible();
   });
 
   test("sidebar navigation links are present", async ({ page }) => {
-    await page.goto("/");
-
     await expect(page.getByRole("link", { name: "Home" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Templates" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Pipelines" })).toBeVisible();
@@ -23,7 +22,6 @@ test.describe("Smoke Tests", () => {
   });
 
   test("theme switcher changes the active theme", async ({ page }) => {
-    await page.goto("/");
     const html = page.locator("html");
 
     await expect(html).not.toHaveAttribute("data-theme");
@@ -36,8 +34,6 @@ test.describe("Smoke Tests", () => {
   });
 
   test("templates page loads with backend connection", async ({ page }) => {
-    await page.goto("/");
-
     await page.getByRole("link", { name: "Templates" }).click();
 
     await expect(page.getByRole("heading", { name: "Templates" })).toBeVisible();
